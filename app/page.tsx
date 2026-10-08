@@ -325,7 +325,7 @@ export default function Home() {
             letterSpacing: "-1px",
           }}
         >
-          The Daily Archive
+          The Daily Archive 
         </Title>
         <Box style={{
           padding: "var(--mantine-spacing-md)",
@@ -352,7 +352,7 @@ export default function Home() {
 
       {news.length === 0 ? (
         <Text ta="center" c="dimmed" style={{ fontFamily: FONT_SERIF }}>
-          No news found.
+          No news found.....
         </Text>
       ) : (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: "Real-time news updates with Mantine UI",
 
 
-  icons: {
+  icons: {    
     icon: "/i.png",
     shortcut: "/i.png",
     apple: "/i.png",
