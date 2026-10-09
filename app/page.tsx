@@ -16,20 +16,45 @@ import {
   Alert,
   Box,
   Stack,
+  Grid,
+  Anchor,
+  Divider,
+  TextInput,
+  ActionIcon,
 } from "@mantine/core";
 import { createClient } from "@base44/sdk";
 
-const base44 = createClient({
-  appId: "6ac739626c09d4a58a836242",
-  headers: {
-    Authorization: "Bearer YOUR_PERSONAL_ACCESS_TOKEN", // ← apna token daalo
+// ─── Multiple Base44 App Configs ────────────────────────────────────────────
+const BASE44_SOURCES = [
+  {
+    appId: "6ac73942c980e55d9137380b",
+    entity: "News",
+    label: "Source 1",
   },
-});
+  {
+    appId: "6ac47ab69017eaaaca59d2b6",
+    entity: "NewsArticle",
+    label: "Source 2",
+  },
+  {
+    appId: "6ac74166b60dfff87e4daa42",
+    entity: "News",
+    label: "Source 3",
+  },
+  {
+    appId: "6ac739626c09d4a58a836242",
+    entity: "News",
+    label: "Source 4",
+  },
+];
 
-// --- PREMIUM VINTAGE STYLES ---
-const NEWSPAPER_BG = "#f2efe9";
-const INK_COLOR = "#111111";
-const FONT_SERIF = "'Times New Roman', Times, serif";
+const PERSONAL_ACCESS_TOKEN = "YOUR_PERSONAL_ACCESS_TOKEN"; // ← apna token daalo
+
+// Colors
+const DARK = "#1a1a1a";
+const ACCENT = "#e30613";
+const LIGHT_BG = "#f5f5f5";
+const FONT = "'Inter', system-ui, -apple-system, sans-serif";
 
 export default function Home() {
   const [news, setNews] = useState<any[]>([]);
@@ -38,13 +63,55 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchNews() {
+    async function fetchAllNews() {
       try {
         setLoading(true);
         setError(null);
 
-        const records = await base44.entities.News.list();
-        setNews(Array.isArray(records) ? records : []);
+        const allResults: any[] = [];
+
+        // Parallel fetch from all sources
+        const promises = BASE44_SOURCES.map(async (source) => {
+          try {
+            const base44 = createClient({
+              appId: source.appId,
+              headers: {
+                Authorization: `Bearer ${PERSONAL_ACCESS_TOKEN}`,
+              },
+            });
+
+            const records = await base44.entities[source.entity].list();
+
+            if (Array.isArray(records)) {
+              return records.map((r: any) => ({
+                ...r,
+                _source: source.label,
+                _entity: source.entity,
+                _appId: source.appId,
+              }));
+            }
+            return [];
+          } catch (srcErr: any) {
+            console.warn(`Failed to fetch from ${source.label}:`, srcErr?.message);
+            return [];
+          }
+        });
+
+        const results = await Promise.all(promises);
+        results.forEach((arr) => allResults.push(...arr));
+
+        // Sort by date (newest first)
+        allResults.sort((a, b) => {
+          const dateA = new Date(
+            a.created_date || a.createdAt || a.published_at || a.date || 0
+          ).getTime();
+          const dateB = new Date(
+            b.created_date || b.createdAt || b.published_at || b.date || 0
+          ).getTime();
+          return dateB - dateA;
+        });
+
+        setNews(allResults);
       } catch (err: any) {
         console.error(err);
         setError(err?.message || "Failed to load news");
@@ -53,20 +120,75 @@ export default function Home() {
       }
     }
 
-    fetchNews();
+    fetchAllNews();
   }, []);
 
+  // ---------- helpers ----------
+  const getImage = (item: any) =>
+    item.image ||
+    item.image_url ||
+    item.cover_image ||
+    item.thumbnail ||
+    "https://images.unsplash.com/photo-1504711434869-e1ff66873b80?w=800&h=500&fit=crop";
+
+  const getTitle = (item: any) =>
+    item.title || item.name || item.headline || "Untitled";
+
+  const getDesc = (item: any) =>
+    item.description ||
+    item.content ||
+    item.summary ||
+    item.body ||
+    "No description available.";
+
+  const getDate = (item: any) => {
+    const d =
+      item.created_date ||
+      item.createdAt ||
+      item.published_at ||
+      item.date ||
+      Date.now();
+    return new Date(d).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const getFullDate = (item: any) => {
+    const d =
+      item.created_date ||
+      item.createdAt ||
+      item.published_at ||
+      item.date ||
+      Date.now();
+    return new Date(d).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
+  const getBadge = (item: any) =>
+    item.category || item.badge || item.tag || item.type || "News";
+
+  // ---------- LOADING / ERROR ----------
   if (loading) {
     return (
-      <Center h="70vh" bg={NEWSPAPER_BG}>
-        <Loader size="lg" color="dark" />
+      <Center h="70vh" bg={LIGHT_BG}>
+        <Stack align="center" gap="md">
+          <Loader size="lg" color={ACCENT} />
+          <Text size="sm" c="dimmed">
+            Saari sources se news load ho rahi hai...
+          </Text>
+        </Stack>
       </Center>
     );
   }
 
   if (error) {
     return (
-      <Container size="sm" py={40} bg={NEWSPAPER_BG}>
+      <Container size="sm" py={40}>
         <Alert color="red" title="Error">
           {error}
         </Alert>
@@ -74,370 +196,528 @@ export default function Home() {
     );
   }
 
-  // ========== NEWSPAPER DETAIL VIEW ==========
+  // ========== NEW MODERN READ MORE / DETAIL VIEW ==========
   if (selectedNews) {
     const item = selectedNews;
-
-    const title = item.title || item.name || item.headline || "Untitled";
-    const description =
-      item.description || item.content || item.summary || item.body || "";
-    const image =
-      item.image ||
-      item.image_url ||
-      item.cover_image ||
-      item.thumbnail ||
-      null;
-    const date =
-      item.created_date ||
-      item.createdAt ||
-      item.published_at ||
-      item.date ||
-      new Date().toISOString();
-
-    const formattedDate = new Date(date)
-      .toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-      .toUpperCase();
-
-    // Description divide into halves
-    const mid = Math.ceil(description.length / 2);
-    const leftText = description.slice(0, mid);
-    const rightText = description.slice(mid);
+    const title = getTitle(item);
+    const description = getDesc(item);
+    const image = getImage(item);
 
     return (
-      <Box
-        style={{
-          minHeight: "100vh",
-          background: "#e0ddd5",
-          padding: "20px 10px",
-          fontFamily: FONT_SERIF,
-        }}
-      >
-        <Container size="md" px={{ base: 0, sm: "xs" }}>
-          {/* Back Button */}
-          <Button
-            variant="subtle"
-            color="dark"
-            mb="md"
-            onClick={() => setSelectedNews(null)}
-            styles={{ root: { fontFamily: FONT_SERIF, color: INK_COLOR, fontWeight: 700 } }}
-          >
-            ← Back to Archive
-          </Button>
+      <Box bg={LIGHT_BG} style={{ minHeight: "100vh", fontFamily: FONT }}>
+        {/* Top Navigation */}
+        <Box bg={DARK} c="white" py="sm" style={{ position: "sticky", top: 0, zIndex: 100 }}>
+          <Container size="lg">
+            <Group justify="space-between">
+              <Group gap="xs">
+                <Box
+                  style={{
+                    width: 28,
+                    height: 28,
+                    background: ACCENT,
+                    borderRadius: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 900,
+                    fontSize: 14,
+                  }}
+                >
+                  F
+                </Box>
+                <Text fw={800} size="lg">
+                  Fastupdate24
+                </Text>
+              </Group>
 
-          {/* --- NEWSPAPER SHEET START --- */}
-          <Box
-            p={{ base: 20, sm: 40, md: 50 }}
+              <Button
+                variant="light"
+                color="gray"
+                radius="md"
+                size="sm"
+                onClick={() => setSelectedNews(null)}
+              >
+                ← Back to Home
+              </Button>
+            </Group>
+          </Container>
+        </Box>
+
+        <Container size="md" py={{ base: 30, md: 50 }}>
+          {/* Meta info */}
+          <Group gap="sm" mb="md">
+            <Badge color="red" size="lg" radius="sm" variant="filled">
+              {getBadge(item)}
+            </Badge>
+            {item._source && (
+              <Badge color="dark" size="sm" variant="outline">
+                {item._source}
+              </Badge>
+            )}
+            <Text size="sm" c="dimmed" fw={500}>
+              {getFullDate(item)}
+            </Text>
+          </Group>
+
+          {/* Big Title */}
+          <Title
+            order={1}
+            mb="xl"
             style={{
-              background: NEWSPAPER_BG,
-              backgroundImage: `radial-gradient(#dcdcdc 0.5px, transparent 0.5px), radial-gradient(#dcdcdc 0.5px, #f2efe9 0.5px)`,
-              backgroundSize: `20px 20px`,
-              backgroundPosition: `0 0, 10px 10px`,
-              border: `1px solid #c0c0c0`,
-              boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
-              maxWidth: 900,
-              margin: "0 auto",
-              color: INK_COLOR,
-              position: "relative",
+              fontSize: "clamp(1.7rem, 4.5vw, 2.7rem)",
+              fontWeight: 800,
+              lineHeight: 1.25,
+              color: DARK,
             }}
           >
-            {/* 1. TOP DECORATIVE LINES */}
-            <Box style={{ borderTop: `6px solid ${INK_COLOR}`, marginBottom: 2 }} />
-            <Box style={{ borderTop: `2px solid ${INK_COLOR}`, marginBottom: 15 }} />
+            {title}
+          </Title>
 
-            {/* 2. MASTHEAD (THE SOCIETY) */}
+          {/* Featured Image */}
+          <Box
+            mb="xl"
+            style={{
+              borderRadius: 16,
+              overflow: "hidden",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
+            }}
+          >
+            <Image
+              src={image}
+              alt={title}
+              h={{ base: 240, sm: 360, md: 440 }}
+              fit="cover"
+            />
+          </Box>
+
+          {/* Article Content Card */}
+          <Box
+            bg="white"
+            p={{ base: "lg", sm: "xl" }}
+            style={{
+              borderRadius: 16,
+              border: "1px solid #eaeaea",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+            }}
+          >
             <Text
-              ta="center"
               style={{
-                fontSize: "clamp(38px, 9vw, 95px)",
-                fontWeight: 900,
-                letterSpacing: "-1px",
-                lineHeight: 0.9,
-                color: INK_COLOR,
-                fontFamily: FONT_SERIF,
-                marginBottom: 12,
-                textTransform: "uppercase",
+                fontSize: 17,
+                lineHeight: 1.85,
+                color: "#333",
+                whiteSpace: "pre-line",
               }}
             >
-              THE SOCIETY
+              {description}
             </Text>
 
-            {/* 3. INFO BAR */}
-            <Group
-              justify="space-between"
-              mb="lg"
-              gap="xs"
-              style={{
-                borderTop: `2px solid ${INK_COLOR}`,
-                borderBottom: `1px solid ${INK_COLOR}`,
-                padding: "8px 0",
-                fontSize: 11,
-                letterSpacing: 1,
-                color: INK_COLOR,
-                textTransform: "uppercase",
-                fontWeight: 700,
-                fontFamily: FONT_SERIF,
-              }}
-            >
-              <Text size="xs" fw={700}>VOL. 19, NO.190</Text>
-              <Text size="xs" fw={700}>★ REALLYGREATSITE.COM ★</Text>
-              <Text size="xs" fw={700}>{formattedDate}</Text>
-            </Group>
+            <Divider my="xl" color="#eee" />
 
-            {/* 4. BREAKING NEWS HEADER */}
-            <Box style={{ borderBottom: `2px solid ${INK_COLOR}`, paddingBottom: 8, marginBottom: 24 }}>
-              <Text
-                ta="center"
-                style={{
-                  fontSize: "clamp(24px, 5vw, 44px)",
-                  fontWeight: 700,
-                  letterSpacing: 2,
-                  color: INK_COLOR,
-                  fontFamily: FONT_SERIF,
-                  textTransform: "uppercase",
-                }}
-              >
-                Breaking News
-              </Text>
-            </Box>
-
-            {/* --- 5. MAIN CONTENT RESPONSIVE GRID --- */}
-            <SimpleGrid cols={{ base: 1, md: 2 }} spacing={{ base: "xl", md: 40 }} >
-              {/* LEFT COLUMN */}
+            <Group justify="space-between" align="center">
               <Box>
-                {/* Main Headline */}
-                <Text
-                  style={{
-                    fontSize: "clamp(22px, 4vw, 36px)",
-                    fontWeight: 700,
-                    lineHeight: 1.15,
-                    color: INK_COLOR,
-                    fontFamily: FONT_SERIF,
-                    marginBottom: 20,
-                    textTransform: "uppercase",
-                    textAlign: "left",
-                  }}
-                >
-                  {title}
+                <Text size="sm" c="dimmed">
+                  Published on
                 </Text>
-
-                {/* Article Body */}
-                <Text
-                  style={{
-                    fontSize: 15,
-                    lineHeight: 1.65,
-                    color: "#222",
-                    textAlign: "justify",
-                    fontFamily: FONT_SERIF,
-                  }}
-                >
-                  {leftText || description}
+                <Text size="sm" fw={600}>
+                  {getFullDate(item)}
                 </Text>
               </Box>
 
-              {/* RIGHT COLUMN */}
-              <Stack gap="lg">
-                {image && (
-                  <Box>
-                    <Image
-                      src={image}
-                      alt={title}
-                      radius={0}
-                      style={{
-                        width: "100%",
-                        border: `1px solid ${INK_COLOR}`,
-                        filter: "grayscale(100%) contrast(1.2) brightness(0.95)",
-                        boxShadow: "4px 4px 0px rgba(0,0,0,0.1)",
-                      }}
-                    />
-                    {rightText && (
-                      <Text
-                        mt={10}
-                        style={{
-                          fontSize: 12,
-                          lineHeight: 1.5,
-                          color: "#333",
-                          fontFamily: FONT_SERIF,
-                          textAlign: "justify",
-                          fontStyle: "italic",
-                          borderBottom: `1px solid #ccc`,
-                          paddingBottom: 15,
-                        }}
-                      >
-                        {rightText.slice(0, 200)}...
-                      </Text>
-                    )}
-                  </Box>
-                )}
-
-                {/* Boxed Quote */}
-                <Box
-                  style={{
-                    border: `3px double ${INK_COLOR}`,
-                    padding: "16px",
-                    background: "rgba(0,0,0,0.02)",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      letterSpacing: 1,
-                      color: INK_COLOR,
-                      fontFamily: FONT_SERIF,
-                      textAlign: "center",
-                      textTransform: "uppercase",
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    &quot;SOCIETY&apos;S ESSENCE,
-                    <br />
-                    REFLECTED IN UNITY.&quot;
-                  </Text>
-                </Box>
-              </Stack>
-            </SimpleGrid>
-
-            {/* BOTTOM DECORATIVE LINES */}
-            <Box style={{ borderTop: `2px solid ${INK_COLOR}`, marginTop: 40 }} />
-            <Box style={{ borderTop: `6px solid ${INK_COLOR}`, marginTop: 3 }} />
+              <Button
+                variant="filled"
+                color="red"
+                radius="md"
+                size="md"
+                onClick={() => setSelectedNews(null)}
+              >
+                ← Back to All News
+              </Button>
+            </Group>
           </Box>
-          {/* --- NEWSPAPER SHEET END --- */}
+
+          {/* More News Suggestion */}
+          {news.length > 1 && (
+            <Box mt={50}>
+              <Title order={3} mb="lg" style={{ fontWeight: 700 }}>
+                More News
+              </Title>
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                {news
+                  .filter((n) => n.id !== item.id)
+                  .slice(0, 4)
+                  .map((n) => (
+                    <Card
+                      key={n.id}
+                      padding="sm"
+                      radius="md"
+                      withBorder
+                      style={{ cursor: "pointer" }}
+                      onClick={() => setSelectedNews(n)}
+                    >
+                      <Group wrap="nowrap" gap="sm">
+                        <Image
+                          src={getImage(n)}
+                          w={70}
+                          h={70}
+                          radius={8}
+                          fit="cover"
+                        />
+                        <Box>
+                          <Text size="sm" fw={600} lineClamp={2}>
+                            {getTitle(n)}
+                          </Text>
+                          <Text size="xs" c="dimmed" mt={4}>
+                            {getDate(n)}
+                          </Text>
+                        </Box>
+                      </Group>
+                    </Card>
+                  ))}
+              </SimpleGrid>
+            </Box>
+          )}
         </Container>
       </Box>
     );
   }
 
-  // ========== LIST VIEW (Cards) ==========
+  // ========== LIST VIEW ==========
+  const featured = news[0];
+  const latest = news.slice(1, 4);
+  const popular = news.slice(4, 7);
+  const trending = news.slice(7, 15); // more news in trending
+
   return (
-    <Container size="lg" py={{ base: 30, sm: 60 }} bg={NEWSPAPER_BG} style={{ minHeight: "100vh" }}>
-      <Box mb={40} style={{ borderBottom: `4px solid ${INK_COLOR}`, paddingBottom: 10 }}>
-        <Title
-          order={1}
-          ta="center"
+    <Box bg={LIGHT_BG} style={{ minHeight: "100vh", fontFamily: FONT }}>
+      {/* ===== TOP DARK HEADER ===== */}
+      <Box bg={DARK} c="white" style={{ position: "relative" }}>
+        {/* FREE ribbon */}
+        <Box
           style={{
-            fontFamily: FONT_SERIF,
-            color: INK_COLOR,
-            fontSize: "clamp(2rem, 5vw, 3rem)",
-            letterSpacing: "-1px",
+            position: "absolute",
+            top: 0,
+            right: 0,
+            width: 120,
+            height: 120,
+            overflow: "hidden",
+            zIndex: 10,
           }}
         >
-          The Daily Archive 
-        </Title>
-        <Box style={{
-          padding: "var(--mantine-spacing-md)",
-          marginTop: "var(--mantine-spacing-md)",
-          display: "flex",
-          justifyContent: "center",
-          gap: "10px",
-        }}>
-          <Button component="a" href="/Part-2">
-            Part-2
-          </Button>
-          <Button component="a" href="/part-3">
-            Part-3
-          </Button>
-          <Button component="a" href="/part-4">
-            Part-4
-          </Button>
-          <Button component="a" href="/part-5">
-            Part-5
-          </Button>
+          <Box
+            style={{
+              position: "absolute",
+              top: 18,
+              right: -35,
+              background: ACCENT,
+              color: "white",
+              width: 160,
+              textAlign: "center",
+              fontWeight: 800,
+              fontSize: 14,
+              letterSpacing: 1,
+              transform: "rotate(45deg)",
+              padding: "6px 0",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+            }}
+          >
+            FREE
+          </Box>
         </Box>
 
+        <Container size="xl" py="sm">
+          <Group justify="space-between" align="center" wrap="wrap" gap="md">
+            <Group gap="xs">
+              <Box
+                style={{
+                  width: 32,
+                  height: 32,
+                  background: ACCENT,
+                  borderRadius: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 900,
+                  fontSize: 18,
+                }}
+              >
+                F
+              </Box>
+              <Text fw={900} size="xl" style={{ letterSpacing: -0.5 }}>
+                Fastupdate24
+              </Text>
+            </Group>
+
+            <Group gap="lg" visibleFrom="sm">
+              {["Home", "Category", "Contact", "About"].map((link) => (
+                <Anchor key={link} c="white" size="sm" fw={500} href="#">
+                  {link}
+                </Anchor>
+              ))}
+            </Group>
+
+            <Group gap="xs">
+              <TextInput
+                placeholder="Search..."
+                size="xs"
+                radius="xl"
+                styles={{
+                  input: {
+                    background: "rgba(255,255,255,0.1)",
+                    border: "none",
+                    color: "white",
+                    width: 160,
+                  },
+                }}
+                visibleFrom="md"
+              />
+              <ActionIcon variant="subtle" c="white" size="lg">
+                ☰
+              </ActionIcon>
+            </Group>
+          </Group>
+        </Container>
+
+        {/* Hero */}
+        <Box
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url(https://images.unsplash.com/photo-1504711434869-e1ff66873b80?w=1400&h=400&fit=crop)",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            padding: "48px 0 56px",
+            textAlign: "center",
+          }}
+        >
+          <Container size="md">
+            <Title
+              order={1}
+              style={{
+                fontSize: "clamp(1.8rem, 5vw, 3rem)",
+                fontWeight: 900,
+                letterSpacing: -1,
+                color: "white",
+              }}
+            >
+              Fastupdate24
+            </Title>
+            <Text c="gray.3" mt={8} size="sm">
+              {news.length} news loaded from multiple sources
+            </Text>
+          </Container>
+        </Box>
       </Box>
 
-      {news.length === 0 ? (
-        <Text ta="center" c="dimmed" style={{ fontFamily: FONT_SERIF }}>
-          No news found.....
-        </Text>
-      ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
-          {news.map((item) => {
-            const title = item.title || item.name || item.headline || "Untitled";
-            const description =
-              item.description ||
-              item.content ||
-              item.summary ||
-              item.body ||
-              "No description available.";
-            const image =
-              item.image ||
-              item.image_url ||
-              item.cover_image ||
-              item.thumbnail ||
-              "https://images.unsplash.com/photo-1504711434869-e1ff66873b80?w=400&h=250&fit=crop";
-            const badge =
-              item.category || item.badge || item.tag || item.type || "News";
+      {/* ===== MAIN CONTENT ===== */}
+      <Container size="xl" py={{ base: 24, md: 40 }}>
+        <Grid>
+          {/* LEFT – Latest */}
+          <Grid.Col span={{ base: 12, md: 3 }}>
+            <Box
+              bg="white"
+              p="md"
+              style={{ borderRadius: 8, border: "1px solid #eaeaea", height: "100%" }}
+            >
+              <Group justify="space-between" mb="md">
+                <Title order={4} style={{ fontSize: 16, fontWeight: 700, color: "black" }}>
+                  Latest
+                </Title>
+                <Box w={8} h={8} bg="green" style={{ borderRadius: "50%" }} />
+              </Group>
 
-            return (
+              <Stack gap="md">
+                {(latest.length ? latest : news.slice(0, 3)).map((item, i) => (
+                  <Box
+                    key={item.id || i}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => setSelectedNews(item)}
+                  >
+                    <Group align="flex-start" gap="sm" wrap="nowrap">
+                      <Image
+                        src={getImage(item)}
+                        w={56}
+                        h={56}
+                        radius={4}
+                        fit="cover"
+                        style={{ flexShrink: 0 }}
+                      />
+                      <Box>
+                        <Text size="sm" fw={600} lineClamp={2} style={{ lineHeight: 1.3, color: "black" }}>
+                          {getTitle(item)}
+                        </Text>
+                        <Text size="xs" c="dimmed" mt={4}>
+                          {getDate(item)}
+                        </Text>
+                      </Box>
+                    </Group>
+                    {i < 2 && <Divider mt="md" color="#f0f0f0" />}
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          </Grid.Col>
+
+          {/* CENTER – Main Events */}
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Box
+              bg="white"
+              p="md"
+              style={{ borderRadius: 8, border: "1px solid #eaeaea", height: "100%" }}
+            >
+              <Title order={4} mb="md" style={{ fontSize: 16, fontWeight: 700, color: "black" }}>
+                Main Events
+              </Title>
+
+              {featured && (
+                <Box
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setSelectedNews(featured)}
+                >
+                  <Box style={{ position: "relative", marginBottom: 16 }}>
+                    <Image
+                      src={getImage(featured)}
+                      h={{ base: 220, sm: 280 }}
+                      radius={6}
+                      fit="cover"
+                    />
+                    <Badge
+                      color="red"
+                      size="sm"
+                      style={{ position: "absolute", top: 12, left: 12 }}
+                    >
+                      Featured
+                    </Badge>
+                  </Box>
+
+                  <Text
+                    fw={700}
+                    style={{ fontSize: "clamp(1.1rem, 2.5vw, 1.35rem)", lineHeight: 1.3, color: "black" }}
+                    mb={8}
+                    lineClamp={2}
+                  >
+                    {getTitle(featured)}
+                  </Text>
+
+                  <Text size="sm" c="dimmed" lineClamp={2} mb={8}>
+                    {getDesc(featured)}
+                  </Text>
+
+                  <Text size="xs" c="dimmed">
+                    {getDate(featured)}
+                  </Text>
+                </Box>
+              )}
+            </Box>
+          </Grid.Col>
+
+          {/* RIGHT – Popular */}
+          <Grid.Col span={{ base: 12, md: 3 }}>
+            <Box
+              bg="white"
+              p="md"
+              style={{ borderRadius: 8, border: "1px solid #eaeaea", height: "100%" }}
+            >
+              <Group justify="space-between" mb="md">
+                <Title order={4} style={{ fontSize: 16, fontWeight: 700, color: "black" }}>
+                  Popular
+                </Title>
+                <Box w={8} h={8} bg="orange" style={{ borderRadius: "50%" }} />
+              </Group>
+
+              <Stack gap="md">
+                {(popular.length ? popular : news.slice(3, 6)).map((item, i) => (
+                  <Box
+                    key={item.id || i}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => setSelectedNews(item)}
+                  >
+                    <Group align="flex-start" gap="sm" wrap="nowrap">
+                      <Image
+                        src={getImage(item)}
+                        w={56}
+                        h={56}
+                        radius={4}
+                        fit="cover"
+                        style={{ flexShrink: 0 }}
+                      />
+                      <Box>
+                        <Text size="sm" fw={600} lineClamp={2} style={{ lineHeight: 1.3, color: "black" }}>
+                          {getTitle(item)}
+                        </Text>
+                        <Text size="xs" c="dimmed" mt={4}>
+                          {getDate(item)}
+                        </Text>
+                      </Box>
+                    </Group>
+                    {i < 2 && <Divider mt="md" color="#f0f0f0" />}
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          </Grid.Col>
+        </Grid>
+
+        {/* ===== ALL NEWS / TRENDING GRID ===== */}
+        <Box mt={{ base: 40, md: 56 }}>
+          <Title
+            order={3}
+            ta="center"
+            mb="xl"
+            style={{
+              fontSize: 18,
+              fontWeight: 900,
+              letterSpacing: 1,
+              textTransform: "uppercase",
+              color: "black",
+            }}
+          >
+            — ALL NEWS —
+          </Title>
+
+          <SimpleGrid cols={{ base: 1, xs: 2, md: 3, lg: 4 }} spacing="lg">
+            {news.map((item, idx) => (
               <Card
-                key={item.id}
-                shadow="sm"
-                padding="lg"
-                radius="xs"
+                key={item.id || idx}
+                padding={0}
+                radius="md"
                 withBorder
                 style={{
-                  background: "#fff",
-                  borderColor: "#aaa",
+                  borderColor: "#eaeaea",
                   cursor: "pointer",
+                  overflow: "hidden",
+                  background: "white",
+                  transition: "transform 0.2s, box-shadow 0.2s",
                 }}
                 onClick={() => setSelectedNews(item)}
               >
-                <Card.Section style={{ borderBottom: `1px solid #eee` }}>
-                  <Image
-                    src={image}
-                    height={180}
-                    alt={title}
-                    style={{ filter: "grayscale(100%) contrast(1.1)" }}
-                  />
+                <Card.Section>
+                  <Image src={getImage(item)} h={160} fit="cover" />
                 </Card.Section>
 
-                <Group justify="space-between" mt="md" mb="xs">
-                  <Badge color="dark" variant="filled" radius="xs" style={{ fontFamily: FONT_SERIF }}>
-                    {badge}
-                  </Badge>
-                  <Text size="xs" c="dimmed" fw={700} style={{ fontFamily: FONT_SERIF }}>
-                    {new Date(item.created_date || Date.now()).toLocaleDateString()}
+                <Box p="md">
+                  <Group gap="xs" mb={8}>
+                    <Badge size="xs" variant="light" color="gray">
+                      {getBadge(item)}
+                    </Badge>
+                    {item._source && (
+                      <Badge size="xs" variant="outline" color="red">
+                        {item._source}
+                      </Badge>
+                    )}
+                  </Group>
+
+                  <Text fw={600} size="sm" lineClamp={2} style={{ lineHeight: 1.35, color: "black" }}>
+                    {getTitle(item)}
                   </Text>
-                </Group>
 
-                <Text
-                  fw={800}
-                  lineClamp={2}
-                  style={{
-                    fontFamily: FONT_SERIF,
-                    color: INK_COLOR,
-                    fontSize: "1.15rem",
-                    lineHeight: 1.25,
-                    marginBottom: 8,
-                  }}
-                >
-                  {title}
-                </Text>
-
-                <Text size="sm" c="dimmed" lineClamp={3} style={{ fontFamily: FONT_SERIF, lineHeight: 1.5 }}>
-                  {description}
-                </Text>
-
-                <Button
-                  variant="outline"
-                  color="dark"
-                  radius="xs"
-                  fullWidth
-                  mt="lg"
-                  style={{ fontFamily: FONT_SERIF, borderWidth: 2, fontWeight: 700 }}
-                >
-                  Read Article
-                </Button>
+                  <Text size="xs" c="dimmed" mt={6}>
+                    {getDate(item)}
+                  </Text>
+                </Box>
               </Card>
-            );
-          })}
-        </SimpleGrid>
-      )}
-    </Container>
+            ))}
+          </SimpleGrid>
+        </Box>
+      </Container>
+    </Box>
   );
 }
