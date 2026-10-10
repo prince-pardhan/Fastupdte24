@@ -61,6 +61,21 @@ const BASE44_SOURCES = [
     entity: "News",
     label: "Source 7",
   },
+  {
+    appId: "6ac9d498df194de5527bec19",
+    entity: "News",
+    label: "Source 8",
+  },
+  {
+    appId: "6aa8e8cfd6878fb3c6c66a6d",
+    entity: "News",
+    label: "Source 9",
+  },
+  {
+    appId: "6ac9d305c9956c412b63d620",
+    entity: "Article",
+    label: "Source 10",
+  },
 ];
 
 const PERSONAL_ACCESS_TOKEN = "YOUR_PERSONAL_ACCESS_TOKEN"; // ← apna token daalo
