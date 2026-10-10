@@ -256,7 +256,7 @@ export default function Home() {
                   N
                 </Box>
                 <Text fw={800} size="lg">
-                  newzfast
+                  Newzfast
                 </Text>
               </Group>
 
