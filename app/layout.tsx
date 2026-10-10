@@ -7,7 +7,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "newzfast",
+  title: "Newzfast",
   description: "NewzFast brings you the latest breaking news, live updates, India news, world news, politics, business, technology, sports, entertainment, education, and local news. Get fast, accurate, and reliable news updates every day.",
 
 
