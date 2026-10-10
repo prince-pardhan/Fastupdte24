@@ -238,10 +238,10 @@ export default function Home() {
                     fontSize: 14,
                   }}
                 >
-                  F
+                  N
                 </Box>
                 <Text fw={800} size="lg">
-                  Fastupdate24
+                  newzfast
                 </Text>
               </Group>
 
@@ -458,7 +458,7 @@ export default function Home() {
                 F
               </Box>
               <Text fw={900} size="xl" style={{ letterSpacing: -0.5 }}>
-                Fastupdate24
+                Newzfast
               </Text>
             </Group>
 
@@ -513,7 +513,7 @@ export default function Home() {
                 color: "white",
               }}
             >
-              Fastupdate24
+              Newzfast 
             </Title>
             <Text c="gray.3" mt={8} size="sm">
               {news.length} news loaded from multiple sources
