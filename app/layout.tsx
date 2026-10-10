@@ -7,14 +7,14 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "FastUpdate24",
-  description: "Real-time news updates with Mantine UI",
+  title: "newzfast",
+  description: "NewzFast brings you the latest breaking news, live updates, India news, world news, politics, business, technology, sports, entertainment, education, and local news. Get fast, accurate, and reliable news updates every day.",
 
 
   icons: {    
-    icon: "/i.png",
-    shortcut: "/i.png",
-    apple: "/i.png",
+    icon: "/fast.png",
+    shortcut: "/fast.png",
+    apple: "/fast.png",
   },
 };
 
