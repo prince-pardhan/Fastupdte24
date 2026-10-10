@@ -238,7 +238,7 @@ export default function Home() {
                     fontSize: 14,
                   }}
                 >
-                  N
+                  F
                 </Box>
                 <Text fw={800} size="lg">
                   newzfast
